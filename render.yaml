@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: ig-downloader-node
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
