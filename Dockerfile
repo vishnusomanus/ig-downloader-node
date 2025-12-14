@@ -1,8 +1,9 @@
 FROM node:18-bullseye
 
-# Install yt-dlp
+# Install Python and pip, then install yt-dlp
 RUN apt-get update && \
-    apt-get install -y yt-dlp && \
+    apt-get install -y python3 python3-pip curl && \
+    pip3 install --no-cache-dir yt-dlp && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
