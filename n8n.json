@@ -1,0 +1,228 @@
+{
+  "name": "Instagram Reel Downloader to Drive latest",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "dd4e78e7-bc51-4af5-bcd7-10d92397a669",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "4a98bf0f-b80f-4a83-a837-8cbd9be89110",
+      "credentials": {
+        "telegramApi": {
+          "id": "dLtnqoq2w68BAYCC",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "const text = $json.message.text || '';\nconst regex = /(https?:\\/\\/(www\\.)?instagram\\.com\\/reel\\/[^\\s]+)/g;\nconst matches = text.match(regex) || [];\n\nreturn matches.map(url => ({\n  json: {\n    reel_url: url,\n    date: new Date().toISOString(),\n    chat: $json.message.chat.title || $json.message.chat.username || 'Private'\n  }\n}));"
+      },
+      "id": "cd24b2fb-75c4-41cc-8887-8e551502653b",
+      "name": "Extract Reel URL",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        256,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://ig-downloader-node-i8kz.onrender.com/download",
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "url",
+              "value": "={{ $json.reel_url }}"
+            }
+          ]
+        }
+      },
+      "id": "d3ee8f3d-51ed-4e8d-bb09-d5b52deadbd3",
+      "name": "Download Insta Video",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        528,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$json.url}}",
+        "responseFormat": "file",
+        "options": {}
+      },
+      "id": "a0be6f9d-0c6b-44e7-a918-956cf65c6d23",
+      "name": "Fetch Video File",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        800,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "name": "=video_{{$now.toFormat('yyyy-MM-dd_HH-mm-ss')}}",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1UH_k7o_DEmNNq69ovzXX2iQ77-JYO7g8",
+          "mode": "list",
+          "cachedResultName": "instagram videos",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1UH_k7o_DEmNNq69ovzXX2iQ77-JYO7g8"
+        },
+        "options": {}
+      },
+      "id": "d85bc668-ea81-48c8-bded-1a34e113f4de",
+      "name": "Upload to Google Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1088,
+        0
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "rsgVmQqtEmPGOjI8",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Get data from previous nodes\nconst reelUrl = $('Extract Reel URL').item.json.reel_url || '';\nconst description = $('Download Insta Video').item.json.description || '';\nconst driveData = $json || {};\n\n// Prepare row as key-value object\nconst rowData = {\n  reel_url: reelUrl,                     // Column A\n  description: description,              // Column B\n  drive_id: driveData.id || '',           // Column C\n  drive_name: driveData.name || '',       // Column D\n  mime_type: driveData.mimeType || '',    // Column E\n  view_link: driveData.webViewLink || '', // Column F\n  size: driveData.size || '',             // Column G\n  created_time: driveData.createdTime || '', // Column H\n  modified_time: driveData.modifiedTime || '', // Column I\n  parent_folder: Array.isArray(driveData.parents)\n    ? driveData.parents[0]\n    : (driveData.parents || '')           // Column J\n};\n\n// Add any additional Drive properties dynamically\nObject.keys(driveData).forEach(key => {\n  if (!(key in rowData)) {\n    rowData[key] = driveData[key];\n  }\n});\n\nreturn {\n  json: rowData\n};\n"
+      },
+      "id": "ee90490e-947b-4865-92a6-9e862f01a90d",
+      "name": "Prepare Sheets Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1248,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "sheetId": "1WcAD1HYv6H-NUJKOL_TRKgIGOLGtYI-aBIrLXToeweE",
+        "range": "drive!A:Z",
+        "options": {}
+      },
+      "id": "e46f28a0-3e8a-4070-84f0-6ccbf0b14b3c",
+      "name": "Add to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 2,
+      "position": [
+        1504,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "AAbmy4szg6yEIKmV",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extract Reel URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Reel URL": {
+      "main": [
+        [
+          {
+            "node": "Download Insta Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Insta Video": {
+      "main": [
+        [
+          {
+            "node": "Fetch Video File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Video File": {
+      "main": [
+        [
+          {
+            "node": "Upload to Google Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload to Google Drive": {
+      "main": [
+        [
+          {
+            "node": "Prepare Sheets Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Sheets Data": {
+      "main": [
+        [
+          {
+            "node": "Add to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "553632fd-f54f-41d6-a3ae-c204e41e9f07",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1652311b5c593079458a93b9a8d705c7a1f164cef3adb3b6e04d16d270dbc203"
+  },
+  "id": "nTHwWaAMJWRLqoEo",
+  "tags": []
+}
