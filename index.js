@@ -97,7 +97,8 @@ app.get('/', (req, res) => {
                 <div>
                     <h3 class="font-semibold text-gray-800 mb-2">Response:</h3>
                     <pre class="bg-gray-100 p-4 rounded-lg overflow-x-auto"><code>{
-  "url": "https://scontent.cdninstagram.com/v/..."
+  "url": "https://scontent.cdninstagram.com/v/...",
+  "description": "Video description text..."
 }</code></pre>
                 </div>
             </div>
@@ -149,6 +150,14 @@ app.get('/', (req, res) => {
                                     </video>
                                 </div>
                             </div>
+                            \${data.description ? \`
+                            <div>
+                                <h4 class="text-sm font-semibold text-gray-700 mb-2">Description:</h4>
+                                <div class="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                                    <p class="text-sm text-gray-700 whitespace-pre-wrap">\${data.description}</p>
+                                </div>
+                            </div>
+                            \` : ''}
                             <div class="flex gap-2">
                                 <button
                                     onclick="downloadVideo('\${data.url}')"
@@ -244,23 +253,41 @@ app.post('/download', (req, res) => {
     return res.status(400).json({ error: 'Instagram URL missing' });
   }
 
-  const cmd = `yt-dlp -f "best[ext=mp4]/best" --get-url --no-download "${url}"`;
-
-  exec(cmd, (error, stdout, stderr) => {
-    if (error) {
-      console.error('Error:', error);
-      console.error('Stderr:', stderr);
-      return res.status(500).json({ error: 'Failed to get video URL', details: stderr });
+  // First get the video URL
+  const urlCmd = `yt-dlp -f "best[ext=mp4]/best" --get-url --no-download "${url}"`;
+  
+  exec(urlCmd, (urlError, urlStdout, urlStderr) => {
+    if (urlError) {
+      console.error('Error getting video URL:', urlError);
+      console.error('Stderr:', urlStderr);
+      return res.status(500).json({ error: 'Failed to get video URL', details: urlStderr });
     }
 
-    const videoUrl = stdout.trim();
+    const videoUrl = urlStdout.trim();
     if (!videoUrl || !videoUrl.startsWith('http')) {
       console.error('Invalid URL received:', videoUrl);
       return res.status(500).json({ error: 'No valid video URL found' });
     }
 
-    res.json({
-      url: videoUrl
+    // Get video metadata including description
+    const metadataCmd = `yt-dlp --dump-json --no-download "${url}"`;
+    
+    exec(metadataCmd, (metaError, metaStdout, metaStderr) => {
+      let description = '';
+      
+      if (!metaError && metaStdout) {
+        try {
+          const metadata = JSON.parse(metaStdout);
+          description = metadata.description || metadata.title || '';
+        } catch (parseError) {
+          console.error('Error parsing metadata:', parseError);
+        }
+      }
+
+      res.json({
+        url: videoUrl,
+        description: description
+      });
     });
   });
 });
