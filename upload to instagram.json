@@ -1,0 +1,290 @@
+{
+    "name": "Instagram Reel Uploader (3/day from Sheets + Drive)",
+    "nodes": [
+      {
+        "parameters": {
+          "triggerTimes": {
+            "item": [
+              {
+                "hour": 9
+              },
+              {
+                "hour": 13
+              },
+              {
+                "hour": 18
+              }
+            ]
+          }
+        },
+        "id": "b0484232-bf5a-4d15-942e-d12e6f859636",
+        "name": "Cron (Peak Slots)",
+        "type": "n8n-nodes-base.cron",
+        "typeVersion": 1,
+        "position": [
+          -1024,
+          80
+        ]
+      },
+      {
+        "parameters": {
+          "sheetId": "1WcAD1HYv6H-NUJKOL_TRKgIGOLGtYI-aBIrLXToeweE",
+          "range": "drive!A:Z",
+          "options": {}
+        },
+        "id": "dbaf01f0-e4b1-44e9-80d5-f17430e4e9a9",
+        "name": "Read Pending Rows",
+        "type": "n8n-nodes-base.googleSheets",
+        "typeVersion": 2,
+        "position": [
+          -784,
+          80
+        ],
+        "credentials": {
+          "googleSheetsOAuth2Api": {
+            "id": "AAbmy4szg6yEIKmV",
+            "name": "Google Sheets account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "functionCode": "return $input.all().slice(0, 3).map(item => ({\n  json: {\n    ...item.json,\n    status: 'pending'\n  }\n}));\n"
+        },
+        "id": "64c41052-d7ab-4c04-983c-381377d35c26",
+        "name": "Filter 3 Pending",
+        "type": "n8n-nodes-base.function",
+        "typeVersion": 1,
+        "position": [
+          -544,
+          80
+        ]
+      },
+      {
+        "parameters": {
+          "functionCode": "// Prefer explicit video_url; otherwise build Drive download link from drive_file_id\nconst videoUrl = $json.video_url || $json.videoURL || '';\nconst fileId = $json.drive_id || $json.driveId || '';\nif (videoUrl) {\n  return { json: { ...$json, downloadUrl: videoUrl } };\n}\nif (!fileId) {\n  throw new Error('Missing drive_file_id or video_url');\n}\nconst dl = `https://drive.google.com/uc?export=download&id=${fileId}`;\nreturn { json: { ...$json, downloadUrl: dl } };"
+        },
+        "id": "943f83b9-2c08-442a-a2e0-4ede18ec578a",
+        "name": "Build Download URL",
+        "type": "n8n-nodes-base.function",
+        "typeVersion": 1,
+        "position": [
+          -304,
+          80
+        ]
+      },
+      {
+        "parameters": {
+          "requestMethod": "POST",
+          "url": "=https://graph.facebook.com/v19.0/{{ $json.ig_user_id || $env.IG_USER_ID }}/media",
+          "jsonParameters": true,
+          "options": {},
+          "bodyParametersJson": "={\"media_type\":\"REELS\",\"video_url\":\"{{ $json.downloadUrl }}\",\"caption\":\"{{ $json.description || '' }}\" ,\"access_token\":\"{{ $json.ig_access_token || $env.IG_ACCESS_TOKEN }}\"}"
+        },
+        "id": "ae3382d4-3633-438d-bc2f-c56844c9a0eb",
+        "name": "IG Create Media",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 2,
+        "position": [
+          -64,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "amount": 45,
+          "unit": "seconds"
+        },
+        "id": "6a98ab88-9e5f-4528-b235-f48e17cc62f3",
+        "name": "Wait Encode",
+        "type": "n8n-nodes-base.wait",
+        "typeVersion": 1,
+        "position": [
+          176,
+          0
+        ],
+        "webhookId": "ea36ba3f-7f15-41cb-b4e1-cc0991ee0a0f"
+      },
+      {
+        "parameters": {
+          "requestMethod": "POST",
+          "url": "=https://graph.facebook.com/v19.0/{{ $json.ig_user_id || $env.IG_USER_ID }}/media_publish",
+          "jsonParameters": true,
+          "options": {},
+          "bodyParametersJson": "={\"creation_id\":\"{{ $json.id }}\",\"access_token\":\"{{ $json.ig_access_token || $env.IG_ACCESS_TOKEN }}\"}"
+        },
+        "id": "b73292ed-d014-45b5-8040-e402a7d8bc55",
+        "name": "IG Publish",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 2,
+        "position": [
+          416,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "update",
+          "sheetId": "REPLACE_WITH_SHEET_ID",
+          "range": "Sheet1!A:Z",
+          "options": {
+            "valueInputMode": "RAW"
+          }
+        },
+        "id": "6ff2af93-b86d-438a-bebf-e0446329b39e",
+        "name": "Mark Uploaded",
+        "type": "n8n-nodes-base.googleSheets",
+        "typeVersion": 2,
+        "position": [
+          656,
+          0
+        ],
+        "credentials": {
+          "googleSheetsOAuth2Api": {
+            "id": "AAbmy4szg6yEIKmV",
+            "name": "Google Sheets account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "mode": "passThrough",
+          "options": {}
+        },
+        "id": "6dc386c1-df76-4f97-a421-938d6c1d1bc7",
+        "name": "Merge Publish Data",
+        "type": "n8n-nodes-base.merge",
+        "typeVersion": 2,
+        "position": [
+          416,
+          208
+        ]
+      },
+      {
+        "parameters": {
+          "functionCode": "// Combine original row with publish result\nconst row = $json;\nconst publish = items[0].json;\nconst now = new Date().toISOString();\nreturn {\n  json: {\n    ...row,\n    status: 'uploaded',\n    published_id: publish.id || '',\n    published_time: now\n  }\n};"
+        },
+        "id": "3811bb72-f2c3-47fd-8a55-661799338210",
+        "name": "Prepare Update Row",
+        "type": "n8n-nodes-base.function",
+        "typeVersion": 1,
+        "position": [
+          176,
+          208
+        ]
+      }
+    ],
+    "pinData": {},
+    "connections": {
+      "Cron (Peak Slots)": {
+        "main": [
+          [
+            {
+              "node": "Read Pending Rows",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read Pending Rows": {
+        "main": [
+          [
+            {
+              "node": "Filter 3 Pending",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Filter 3 Pending": {
+        "main": [
+          [
+            {
+              "node": "Build Download URL",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Download URL": {
+        "main": [
+          [
+            {
+              "node": "IG Create Media",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "IG Create Media": {
+        "main": [
+          [
+            {
+              "node": "Wait Encode",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Wait Encode": {
+        "main": [
+          [
+            {
+              "node": "IG Publish",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "IG Publish": {
+        "main": [
+          [
+            {
+              "node": "Merge Publish Data",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Merge Publish Data": {
+        "main": [
+          [
+            {
+              "node": "Prepare Update Row",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Prepare Update Row": {
+        "main": [
+          [
+            {
+              "node": "Mark Uploaded",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "active": false,
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "versionId": "f44431f4-844f-487a-8967-00ae7d66a86a",
+    "meta": {
+      "templateCredsSetupCompleted": true,
+      "instanceId": "1652311b5c593079458a93b9a8d705c7a1f164cef3adb3b6e04d16d270dbc203"
+    },
+    "id": "mcWNmq29BljNaH7k",
+    "tags": []
+  }
