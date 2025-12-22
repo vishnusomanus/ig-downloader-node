@@ -66,6 +66,17 @@ function formatFileSize(bytes) {
   return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
 }
 
+// Helper function to remove Instagram mentions (@username)
+function removeMentions(text) {
+  if (!text) return '';
+  // Remove @mentions (e.g., @abc_abc, @user123)
+  // Matches @ followed by alphanumeric characters, underscores, and dots
+  return String(text)
+    .replace(/@[\w.]+/g, '') // Remove @mentions
+    .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+    .trim();
+}
+
 // Helper function to sanitize metadata values for HTTP headers
 // Removes invalid characters that aren't allowed in HTTP header values
 function sanitizeMetadata(value) {
@@ -541,6 +552,8 @@ app.post('/download', async (req, res) => {
         try {
           const metadata = JSON.parse(metaStdout);
           description = metadata.description || metadata.title || '';
+          // Remove Instagram mentions from description
+          description = removeMentions(description);
           title = metadata.title || '';
           duration = metadata.duration || 0;
         } catch (parseError) {
