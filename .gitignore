@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Environment variables
+.env
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Downloads folder (temporary files)
+downloads/*.mp4
+downloads/*.jpg
+downloads/*.png
+
+# Keep downloads folder structure
+!downloads/.gitkeep
