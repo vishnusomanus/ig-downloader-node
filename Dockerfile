@@ -1,13 +1,20 @@
 FROM node:18-bookworm
 
-# Install Python and pip, then install yt-dlp using venv
+# Install system dependencies
 RUN apt-get update && \
-    apt-get install -y python3 python3-pip python3-venv curl && \
+    apt-get install -y --no-install-recommends \
+        python3 \
+        python3-venv \
+        curl \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Ensure pip is available and create virtual environment
+RUN python3 -m ensurepip --upgrade && \
     python3 -m venv /opt/venv && \
-    /opt/venv/bin/pip install --upgrade pip && \
+    /opt/venv/bin/pip install --upgrade pip setuptools wheel && \
     /opt/venv/bin/pip install --no-cache-dir yt-dlp && \
-    ln -s /opt/venv/bin/yt-dlp /usr/local/bin/yt-dlp && \
-    rm -rf /var/lib/apt/lists/*
+    ln -sf /opt/venv/bin/yt-dlp /usr/local/bin/yt-dlp
 
 WORKDIR /app
 

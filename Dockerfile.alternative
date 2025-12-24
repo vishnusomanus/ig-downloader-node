@@ -1,0 +1,32 @@
+FROM node:18-bookworm
+
+# Install Python 3.11+ and dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        python3.11 \
+        python3.11-venv \
+        python3.11-dev \
+        curl \
+        ca-certificates \
+        build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create symlinks for python3 and pip3 to point to python3.11
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 && \
+    python3.11 -m ensurepip --upgrade
+
+# Install yt-dlp directly (without venv) using --break-system-packages
+RUN python3 -m pip install --upgrade pip && \
+    python3 -m pip install --no-cache-dir --break-system-packages yt-dlp
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm install
+
+COPY . .
+
+EXPOSE 10000
+
+CMD ["npm", "start"]
+
