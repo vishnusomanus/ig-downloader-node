@@ -23,6 +23,34 @@ const R2_CONFIG = {
   urlExpiration: parseInt(process.env.R2_URL_EXPIRATION || '604800', 10) // Default: 7 days in seconds
 };
 
+// Instagram Authentication Configuration (optional)
+const INSTAGRAM_CONFIG = {
+  cookiesFile: process.env.INSTAGRAM_COOKIES_FILE || null, // Path to cookies.txt file
+  username: process.env.INSTAGRAM_USERNAME || null,
+  password: process.env.INSTAGRAM_PASSWORD || null,
+};
+
+// Helper function to build yt-dlp authentication arguments
+function getYtDlpAuthArgs() {
+  const args = [];
+  
+  // Prefer cookies file if available (most secure)
+  if (INSTAGRAM_CONFIG.cookiesFile && fs.existsSync(INSTAGRAM_CONFIG.cookiesFile)) {
+    args.push(`--cookies "${INSTAGRAM_CONFIG.cookiesFile}"`);
+  }
+  // Fallback to username/password if cookies not available
+  else if (INSTAGRAM_CONFIG.username && INSTAGRAM_CONFIG.password) {
+    args.push(`-u "${INSTAGRAM_CONFIG.username}"`);
+    args.push(`-p "${INSTAGRAM_CONFIG.password}"`);
+  }
+  
+  // Add age limit bypass and user agent for better compatibility
+  args.push('--age-limit 999');
+  args.push('--user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"');
+  
+  return args.join(' ');
+}
+
 function ensureR2Config() {
   const missing = [];
   if (!R2_CONFIG.accessKeyId) missing.push('R2_ACCESS_KEY_ID');
@@ -539,8 +567,12 @@ app.post('/download', async (req, res) => {
   const r2Key = `videos/${fileId}.mp4`;
 
   try {
+    // Get authentication arguments
+    const authArgs = getYtDlpAuthArgs();
+    
     // Get video metadata first
-    const metadataCmd = `yt-dlp --dump-json --no-download "${url}"`;
+    // Add options to handle age-restricted and restricted content
+    const metadataCmd = `yt-dlp --dump-json --no-download ${authArgs} "${url}"`;
     
     exec(metadataCmd, async (metaError, metaStdout, metaStderr) => {
       let description = '';
@@ -562,7 +594,8 @@ app.post('/download', async (req, res) => {
       }
 
       // Download the video file
-      const downloadCmd = `yt-dlp -f "best[ext=mp4]/best" -o "${localFilePath}" "${url}"`;
+      // Add options to handle age-restricted and restricted content
+      const downloadCmd = `yt-dlp -f "best[ext=mp4]/best" ${authArgs} -o "${localFilePath}" "${url}"`;
       
       exec(downloadCmd, async (downloadError, downloadStdout, downloadStderr) => {
         if (downloadError) {
