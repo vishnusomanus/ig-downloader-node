@@ -1,4 +1,4 @@
-FROM node:18-bullseye
+FROM node:18-bookworm
 
 # Install Python and pip, then install yt-dlp
 RUN apt-get update && \
