@@ -37,11 +37,17 @@ function getYtDlpAuthArgs() {
   // Prefer cookies file if available (most secure)
   if (INSTAGRAM_CONFIG.cookiesFile && fs.existsSync(INSTAGRAM_CONFIG.cookiesFile)) {
     args.push(`--cookies "${INSTAGRAM_CONFIG.cookiesFile}"`);
+    console.log('✅ Using Instagram cookies file for authentication');
   }
   // Fallback to username/password if cookies not available
   else if (INSTAGRAM_CONFIG.username && INSTAGRAM_CONFIG.password) {
     args.push(`-u "${INSTAGRAM_CONFIG.username}"`);
     args.push(`-p "${INSTAGRAM_CONFIG.password}"`);
+    console.log('✅ Using Instagram username/password for authentication');
+  }
+  else {
+    console.warn('⚠️  No Instagram authentication configured. Age-restricted content may fail.');
+    console.warn('   Set INSTAGRAM_COOKIES_FILE or INSTAGRAM_USERNAME/PASSWORD environment variables.');
   }
   
   // Add age limit bypass and user agent for better compatibility
@@ -601,7 +607,25 @@ app.post('/download', async (req, res) => {
         if (downloadError) {
           console.error('Error downloading video:', downloadError);
           console.error('Stderr:', downloadStderr);
-          return res.status(500).json({ error: 'Failed to download video', details: downloadStderr });
+          
+          // Check if it's an authentication/age-restriction error
+          let errorMessage = 'Failed to download video';
+          let errorDetails = downloadStderr;
+          
+          if (downloadStderr && downloadStderr.includes('inappropriate') || downloadStderr.includes('unavailable for certain audiences')) {
+            const hasAuth = (INSTAGRAM_CONFIG.cookiesFile && fs.existsSync(INSTAGRAM_CONFIG.cookiesFile)) || 
+                          (INSTAGRAM_CONFIG.username && INSTAGRAM_CONFIG.password);
+            
+            if (!hasAuth) {
+              errorMessage = 'Failed to download video: Authentication required';
+              errorDetails = 'This content requires Instagram authentication. Please set INSTAGRAM_COOKIES_FILE or INSTAGRAM_USERNAME/PASSWORD environment variables. See documentation for setup instructions.';
+            } else {
+              errorMessage = 'Failed to download video: Content may be restricted';
+              errorDetails = downloadStderr + '\n\nNote: Even with authentication, some content may be unavailable due to regional restrictions or account limitations.';
+            }
+          }
+          
+          return res.status(500).json({ error: errorMessage, details: errorDetails });
         }
 
         // Check if file was downloaded
